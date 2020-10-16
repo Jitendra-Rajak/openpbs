@@ -286,13 +286,8 @@ propagate_licenses_to_vnodes(mominfo_t *pmom)
 	if (node_index_start)
 		distribute_licenseinfo(pmom, lic_count);
 
-	if (pfrom_Lic == NULL) {
-		for (i = node_index_start;i < ((mom_svrinfo_t *) pmom->mi_data)->msr_numvnds; i++) {
-			pbsnode *n = ((mom_svrinfo_t *) pmom->mi_data)->msr_children[i];
-			add_to_unlicensed_node_list(n);
-		}
+	if (pfrom_Lic == NULL)
 		return;
-	}
 
 	/*
  	 * Now make another pass, this time updating the other vnodes'
