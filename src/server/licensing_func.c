@@ -523,7 +523,9 @@ license_one_node(pbsnode *pnode)
 	set_node_lic_info_attr(pnode);
 
 	if (license_counts.licenses_global > 0 || license_counts.licenses_used > 0) {
-		if (pnode->nd_attr[(int)ND_ATR_License].at_val.at_char != ND_LIC_TYPE_locked) {
+		if ((pnode->nd_attr[(int)ND_ATR_License].at_val.at_char !=
+							ND_LIC_TYPE_locked) && (pnode->nd_attr[(int)ND_ATR_License].at_val.at_char !=
+							ND_LIC_TYPE_cloud)) {
 			if (consume_licenses(pnode->nd_attr[ND_ATR_LicenseInfo].at_val.at_long) == 0) {
 				set_attr_generic(&(pnode->nd_attr[ND_ATR_License]),
 					&node_attr_def[ND_ATR_License],
@@ -678,16 +680,18 @@ init_licensing(struct work_task *ptask)
 		return;
 	}
 	for (i = 0; i < svr_totnodes; i++) {
-	 	clear_node_lic_attrs(pbsndlist[i], 0);
-		if (is_attr_set(&(pbsndlist[i]->nd_attr[ND_ATR_LicenseInfo]))) {
-			licensing_control.licenses_total_needed += get_attr_l(&(pbsndlist[i]->nd_attr[ND_ATR_LicenseInfo]));
-		} else {
-			if (pbsndlist[i]->nd_lic_info != NULL) {
-				set_node_lic_info_attr(pbsndlist[i]);
+		if (pbsndlist[i]->nd_attr[(int)ND_ATR_License].at_val.at_char != ND_LIC_TYPE_cloud) {
+			clear_node_lic_attrs(pbsndlist[i], 0);
+			if (is_attr_set(&(pbsndlist[i]->nd_attr[ND_ATR_LicenseInfo]))) {
 				licensing_control.licenses_total_needed += get_attr_l(&(pbsndlist[i]->nd_attr[ND_ATR_LicenseInfo]));
+			} else {
+				if (pbsndlist[i]->nd_lic_info != NULL) {
+					set_node_lic_info_attr(pbsndlist[i]);
+					licensing_control.licenses_total_needed += get_attr_l(&(pbsndlist[i]->nd_attr[ND_ATR_LicenseInfo]));
+				}
 			}
+			add_to_unlicensed_node_list(pbsndlist[i]);
 		}
-		add_to_unlicensed_node_list(pbsndlist[i]);
 	}
 
 	/* Determine how many licenses we can check out */
@@ -829,6 +833,8 @@ release_node_lic(void *pobj)
 		attribute *ppnl = &pnode->nd_attr[ND_ATR_License];
 		attribute *ppnli = &pnode->nd_attr[ND_ATR_LicenseInfo];
 
+		if (ppnl->at_val.at_char == ND_LIC_TYPE_cloud)
+			return 0;
 		licensing_control.licenses_total_needed -= pnode->nd_attr[ND_ATR_LicenseInfo].at_val.at_long;
 
 		/* release license if node is locked */
@@ -861,8 +867,12 @@ void unset_signature(void *pobj, char *rs_name)
 
 	if (!strcmp(rs_name, ND_RESC_LicSignature)) {
 		ppnl = &pnode->nd_attr[(int) ND_ATR_License];
-		if ((ppnl->at_flags & ATR_VFLAG_SET) && (ppnl->at_val.at_char == ND_LIC_TYPE_cloud))
+		if ((ppnl->at_flags & ATR_VFLAG_SET) && (ppnl->at_val.at_char == ND_LIC_TYPE_cloud)) {
 			clear_attr(ppnl, &node_attr_def[(int) ND_ATR_License]);
+			if (is_attr_set(&(pnode->nd_attr[ND_ATR_LicenseInfo])))
+				licensing_control.licenses_total_needed += get_attr_l(&(pnode->nd_attr[ND_ATR_LicenseInfo]));
+			add_to_unlicensed_node_list(pnode);
+		}
 	}
 }
 
